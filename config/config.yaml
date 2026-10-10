@@ -91,12 +91,12 @@ sources:
   - name: "Meta AI / FAIR Blog"
     type: "rss"
     enabled: true
-    url: "https://ai.meta.com/blog/rss/"
+    url: "https://about.fb.com/news/category/technology-and-innovation/feed/"
 
   - name: "Mistral AI Blog"
     type: "rss"
     enabled: true
-    url: "https://mistral.ai/news/index.xml"
+    url: "https://mistral.ai/rss.xml"
 
   - name: "Hugging Face Blog"
     type: "rss"

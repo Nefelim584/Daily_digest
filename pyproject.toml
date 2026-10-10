@@ -9,6 +9,8 @@ description = "AI and Tech Daily News Digest Collector"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
+    "feedparser>=6.0.14",
+    "httpx>=0.28.1",
     "pydantic>=2.14.0",
     "python-dotenv>=1.2.4",
     "pyyaml>=6.0.3",

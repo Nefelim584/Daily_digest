@@ -1,0 +1,139 @@
+# ==============================================================================
+# Daily Digest Configuration
+# ==============================================================================
+
+# Default time window for collecting news (in hours)
+time_window:
+  default_hours: 24
+
+# Output settings
+output:
+  format: "markdown"              # "markdown" or "text"
+  directory: "data/digests"       # Destination directory for generated digests
+  filename_pattern: "digest_{date}.{ext}"  # {date} formatted as YYYY-MM-DD_HHMM
+
+# Text cleaning & truncation settings (applied via regular expressions)
+cleaning:
+  max_characters: 1500            # Maximum characters per news item preview
+  strip_html_tags: true           # Remove formatting HTML tags
+  strip_images: true              # Remove <img> and media tags
+  strip_links: true               # Remove <a> tags or markdown hyperlinks
+  strip_scripts: true             # Remove <script> and <style> blocks
+
+# RSSHub settings
+rsshub:
+  # Public instance for testing; can be replaced with self-hosted (e.g. http://localhost:1200)
+  base_url: "https://rsshub.app"
+  timeout_seconds: 15
+  access_key: ""                  # Optional access key if RSSHub authentication is enabled
+
+# Mistral AI API settings (One call per news item for summarization)
+mistral:
+  enabled: true
+  env_file: ".env"                # Load environment variables from .env file
+  api_key_env: "MISTRAL_API_KEY"  # Key name in .env
+  model: "mistral-small-latest"   # Chosen model
+  temperature: 0.2
+  max_tokens: 300
+  prompt_template: >
+    You are an AI research digest assistant. Summarize the following news item in 2-3 concise bullet points.
+    Focus on key contributions, released models, and benchmark results.
+
+# Priority & grouping classification rules (Regex matching against titles)
+# Higher priority numbers appear first in the digest.
+priorities:
+  - name: "Major Releases & Breakthroughs"
+    priority: 100
+    regex: "(?i)(release|introducing|launch|breakthrough|gpt-\\d|claude-\\d|gemini|llama|mistral|deepseek|sota)"
+  - name: "Research & Benchmarks"
+    priority: 50
+    regex: "(?i)(paper|benchmark|dataset|architecture|evaluation|reasoning|alignment|vulnerability|jailbreak)"
+  - name: "General News & Updates"
+    priority: 10
+    regex: ".*"
+
+# News sources list
+sources:
+  # --- Research APIs ---
+  - name: "arXiv AI & Security Papers"
+    type: "arxiv_api"
+    enabled: true
+    categories:
+      - "cs.AI"     # Artificial Intelligence
+      - "cs.CL"     # Computation and Language (NLP)
+      - "cs.LG"     # Machine Learning
+      - "cs.CV"     # Computer Vision
+      - "stat.ML"   # Machine Learning (Statistics)
+      - "cs.CR"     # Cryptography and Security (Adversarial ML, AI Safety, Prompt Injections)
+    max_results: 50
+
+  - name: "Hugging Face Daily Papers"
+    type: "huggingface_papers_api"
+    enabled: true
+    endpoint: "https://huggingface.co/api/daily_papers"
+
+  # --- Company & Research Blogs (Direct RSS or RSSHub) ---
+  - name: "OpenAI Blog"
+    type: "rss"
+    enabled: true
+    url: "https://openai.com/news/rss.xml"
+
+  - name: "Anthropic Research"
+    type: "rss"
+    enabled: true
+    url: "https://www.anthropic.com/feed.xml"
+
+  - name: "Google DeepMind"
+    type: "rss"
+    enabled: true
+    url: "https://deepmind.google/blog/rss.xml"
+
+  - name: "Meta AI / FAIR Blog"
+    type: "rss"
+    enabled: true
+    url: "https://ai.meta.com/blog/rss/"
+
+  - name: "Mistral AI Blog"
+    type: "rss"
+    enabled: true
+    url: "https://mistral.ai/news/index.xml"
+
+  - name: "Hugging Face Blog"
+    type: "rss"
+    enabled: true
+    url: "https://huggingface.co/blog/feed.xml"
+
+  # --- Social Media (X / Twitter via RSSHub) ---
+  - name: "X (Twitter) AI Labs & Organizations"
+    type: "rsshub"
+    enabled: true
+    routes:
+      - "/twitter/user/OpenAI"
+      - "/twitter/user/AnthropicAI"
+      - "/twitter/user/GoogleDeepMind"
+      - "/twitter/user/MistralAI"
+      - "/twitter/user/huggingface"
+
+  - name: "X (Twitter) Key AI & Security Researchers"
+    type: "rsshub"
+    enabled: true
+    routes:
+      - "/twitter/user/karpathy"        # Andrej Karpathy
+      - "/twitter/user/sama"            # Sam Altman
+      - "/twitter/user/demishassabis"   # Demis Hassabis
+      - "/twitter/user/DarioAmodei"     # Dario Amodei
+      - "/twitter/user/JensenHuang"     # Jensen Huang
+      - "/twitter/user/arthurmensch"    # Arthur Mensch
+      - "/twitter/user/ylecun"          # Yann LeCun
+      - "/twitter/user/ilyasut"         # Ilya Sutskever
+      - "/twitter/user/polynoamial"     # Noam Brown
+      - "/twitter/user/fchollet"        # François Chollet
+      - "/twitter/user/colah"           # Chris Olah
+      - "/twitter/user/AndrewYNg"       # Andrew Ng
+      - "/twitter/user/hwchase17"       # Harrison Chase
+      - "/twitter/user/simonw"          # Simon Willison
+      - "/twitter/user/troyhunt"        # Troy Hunt
+      - "/twitter/user/adversariel"     # Ariel Herbert-Voss
+      - "/twitter/user/edoardo_debe"    # Edoardo Debenedetti
+      - "/twitter/user/alxndrdavies"    # Xander Davies
+      - "/twitter/user/swisskyrepo"     # Swissky

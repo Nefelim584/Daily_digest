@@ -12,3 +12,4 @@ wheels/
 # Project specific
 todo.md
 data/
+.env

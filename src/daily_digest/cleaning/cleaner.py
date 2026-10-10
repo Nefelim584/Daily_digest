@@ -23,6 +23,7 @@ class HTMLCleaner:
     )
     HTML_TAG_PATTERN = re.compile(r"<[^>]+>", flags=re.DOTALL)
     WHITESPACE_PATTERN = re.compile(r"[ \t\r\f\v]+")
+    PUNCT_WHITESPACE_PATTERN = re.compile(r"\s+([.,!?;:)\]])")
     MULTIPLE_NEWLINES_PATTERN = re.compile(r"\n{3,}")
 
     def __init__(self, config: Optional[CleaningConfig] = None) -> None:
@@ -58,6 +59,7 @@ class HTMLCleaner:
 
         # 6. Normalize whitespace
         text = self.WHITESPACE_PATTERN.sub(" ", text)
+        text = self.PUNCT_WHITESPACE_PATTERN.sub(r"\1", text)
         lines = [line.strip() for line in text.split("\n")]
         text = "\n".join(line for line in lines if line)
         text = self.MULTIPLE_NEWLINES_PATTERN.sub("\n\n", text)

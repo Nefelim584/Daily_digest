@@ -18,3 +18,8 @@ dependencies = [
 
 [project.scripts]
 daily-digest = "daily_digest.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

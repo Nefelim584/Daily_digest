@@ -52,6 +52,25 @@ def create_parser() -> argparse.ArgumentParser:
         help="Disable Mistral AI summarization even if enabled in config",
     )
     parser.add_argument(
+        "--serve",
+        action="store_true",
+        default=False,
+        help="Start asynchronous HTTP API server (FastAPI/Uvicorn) listening on 0.0.0.0",
+    )
+    parser.add_argument(
+        "--host",
+        type=str,
+        default=None,
+        help="Server host interface to listen on (default from config/env, e.g. 0.0.0.0)",
+    )
+    parser.add_argument(
+        "-p",
+        "--port",
+        type=int,
+        default=None,
+        help="Server port to listen on (default from config/env, e.g. 8000)",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -78,6 +97,22 @@ def main(argv: Optional[List[str]] = None) -> int:
     except ConfigurationError as err:
         print(f"Error: {err}", file=sys.stderr)
         return 1
+
+    if args.serve:
+        import uvicorn
+        from .server.app import create_app
+
+        host = args.host or config.server.host
+        port = args.port or config.server.port
+        app_instance = create_app(config)
+        print(f"\nStarting Daily Digest API server on http://{host}:{port} (listening on {host})")
+        uvicorn.run(
+            app_instance,
+            host=host,
+            port=port,
+            log_level="info" if not args.verbose else "debug",
+        )
+        return 0
 
     pipeline = DigestPipeline(config)
 

@@ -1,0 +1,19 @@
+# Version control
+.git/
+.gitnexus/
+
+# Virtual environment and caches
+.venv/
+__pycache__/
+*.py[oc]
+*.egg-info/
+.pytest_cache/
+
+# Project metadata and local docs
+todo.md
+.claude/
+tests/
+
+# Sensitive data and local outputs
+.env
+data/

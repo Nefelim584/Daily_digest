@@ -70,3 +70,33 @@ def test_source_config_creation():
     assert src.type == "rss"
     assert src.enabled is True
     assert src.max_results == 50
+
+
+def test_server_config_defaults():
+    """Verify ServerConfig defaults to 0.0.0.0 and port 8000 for Docker network openness."""
+    from daily_digest.config.models import ServerConfig
+    server_cfg = ServerConfig()
+    assert server_cfg.host == "0.0.0.0"
+    assert server_cfg.port == 8000
+
+
+def test_config_env_overrides(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Verify 12-Factor environment variables override config values."""
+    custom_dir = tmp_path / "env_digests"
+    monkeypatch.setenv("DIGEST_OUTPUT_DIR", str(custom_dir))
+    monkeypatch.setenv("DIGEST_OUTPUT_FORMAT", "text")
+    monkeypatch.setenv("HOST", "0.0.0.0")
+    monkeypatch.setenv("PORT", "9999")
+    monkeypatch.setenv("DIGEST_DEFAULT_HOURS", "48")
+    monkeypatch.setenv("RSSHUB_BASE_URL", "https://custom-rsshub.local")
+    monkeypatch.setenv("MISTRAL_API_KEY", "env_test_key_123")
+
+    cfg = load_config(Path("config/config.yaml"))
+    assert cfg.output.directory == custom_dir
+    assert cfg.output.format == "text"
+    assert cfg.server.host == "0.0.0.0"
+    assert cfg.server.port == 9999
+    assert cfg.time_window.default_hours == 48
+    assert cfg.rsshub.base_url == "https://custom-rsshub.local"
+    assert cfg.mistral.api_key == "env_test_key_123"
+

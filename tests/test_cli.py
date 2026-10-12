@@ -63,3 +63,22 @@ def test_cli_main_success(tmp_path: Path):
         ):
             code = main(["--hours", "24"])
             assert code == 0
+
+
+def test_cli_parser_server_options():
+    """Verify --serve, --host, and --port CLI options."""
+    parser = create_parser()
+    args = parser.parse_args(["--serve", "--host", "0.0.0.0", "-p", "9000"])
+    assert args.serve is True
+    assert args.host == "0.0.0.0"
+    assert args.port == 9000
+
+
+def test_cli_main_serve():
+    """Verify main dispatches to uvicorn when --serve is passed."""
+    with patch("daily_digest.cli.load_config"):
+        with patch("uvicorn.run") as mock_uvicorn:
+            code = main(["--serve", "--host", "0.0.0.0", "--port", "8000"])
+            assert code == 0
+            assert mock_uvicorn.called
+

@@ -114,3 +114,41 @@ def test_digest_exporter_export_digest(tmp_path: Path):
     assert saved_path.suffix == ".txt"
     content = saved_path.read_text(encoding="utf-8")
     assert "DAILY AI & RESEARCH DIGEST" in content
+
+
+def test_digest_exporter_atomic_write_no_leftover_tmp(tmp_path: Path):
+    """Verify that atomic write leaves zero temporary .tmp files on disk."""
+    out_dir = tmp_path / "atomic_digests"
+    cfg = OutputConfig(format="markdown", directory=out_dir)
+    exporter = DigestExporter(config=cfg)
+
+    now = datetime(2026, 10, 11, 15, 0, 0, tzinfo=timezone.utc)
+    target = exporter.save("# Complete Content", generated_at=now)
+
+    assert target.exists()
+    assert target.read_text(encoding="utf-8") == "# Complete Content"
+    # Verify no .tmp files remain in directory
+    assert list(out_dir.glob("*.tmp")) == []
+    assert list(out_dir.glob(".*.tmp")) == []
+
+
+def test_digest_exporter_cleanup_orphans_on_init(tmp_path: Path):
+    """Verify that orphan .tmp files left from crashes are cleaned up upon exporter initialization."""
+    out_dir = tmp_path / "crash_recovery"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    orphan1 = out_dir / "broken_run.md.tmp"
+    orphan1.write_text("partial corrupted content", encoding="utf-8")
+    orphan2 = out_dir / ".hidden_broken.tmp"
+    orphan2.write_text("partial hidden content", encoding="utf-8")
+
+    assert orphan1.exists()
+    assert orphan2.exists()
+
+    cfg = OutputConfig(format="markdown", directory=out_dir)
+    exporter = DigestExporter(config=cfg, clean_orphans_on_init=True)
+
+    # Orphan files should have been removed
+    assert not orphan1.exists()
+    assert not orphan2.exists()
+

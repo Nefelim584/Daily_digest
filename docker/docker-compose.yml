@@ -1,0 +1,55 @@
+services:
+  daily-digest:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: daily-digest
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DIGEST_OUTPUT_DIR=/app/data/digests
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+      - DIGEST_DEFAULT_HOURS=${DIGEST_DEFAULT_HOURS:-24}
+      - RSSHUB_BASE_URL=${RSSHUB_BASE_URL:-https://rsshub.app}
+    volumes:
+      - digests_data:/app/data/digests
+    networks:
+      - digest_network
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()\" || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Consumer service sample (representing Utility Bot or any companion container)
+  # Demonstrates both internal Docker DNS communication (http://daily-digest:8000)
+  # and shared volume access with aligned permissions (UID/GID 1000).
+  consumer-sample:
+    image: alpine:latest
+    container_name: digest-consumer-sample
+    restart: unless-stopped
+    command: >
+      sh -c "echo 'Companion container initialized. Monitoring shared volume /app/data/digests...';
+             while true; do
+               sleep 60;
+             done"
+    volumes:
+      - digests_data:/app/data/digests:ro
+    networks:
+      - digest_network
+    depends_on:
+      daily-digest:
+        condition: service_healthy
+
+volumes:
+  digests_data:
+    name: daily_digest_shared_volume
+
+networks:
+  digest_network:
+    name: daily_digest_network
+    driver: bridge

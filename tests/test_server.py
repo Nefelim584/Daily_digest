@@ -87,10 +87,14 @@ def test_list_tasks_endpoint(client: TestClient):
 
 
 def test_webhook_dispatch_success(test_config: AppConfig):
-    """Verify webhook dispatch sends POST callback upon task completion."""
+    """Verify webhook dispatch sends POST callback upon task completion with X-Secret-Token header."""
     async def _run_test():
         manager = TaskManager(test_config)
-        req = GenerateRequest(hours=12, webhook_url="http://test-companion:8080/webhook")
+        req = GenerateRequest(
+            hours=12,
+            webhook_url="http://test-bot:8080/callback",
+            webhook_secret_token="secret_token_abc_123",
+        )
         record = manager.create_task(req)
         record.status = "completed"
 
@@ -104,9 +108,11 @@ def test_webhook_dispatch_success(test_config: AppConfig):
             assert mock_post.called
             target_url = mock_post.call_args[0][0]
             json_payload = mock_post.call_args[1]["json"]
-            assert target_url == "http://test-companion:8080/webhook"
+            call_headers = mock_post.call_args[1]["headers"]
+            assert target_url == "http://test-bot:8080/callback"
             assert json_payload["task_id"] == record.task_id
             assert json_payload["status"] == "completed"
+            assert call_headers["X-Secret-Token"] == "secret_token_abc_123"
 
     asyncio.run(_run_test())
 

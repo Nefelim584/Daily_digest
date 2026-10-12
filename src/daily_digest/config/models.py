@@ -62,6 +62,26 @@ class MistralConfig(BaseModel):
         default="Summarize the news item concisely in 2-3 bullet points focusing on key contributions.",
         description="Prompt template used for summarization",
     )
+    rate_limit_delay_seconds: float = Field(
+        default=1.0,
+        ge=0.0,
+        description="Pacing delay in seconds between consecutive API calls to prevent 429",
+    )
+    max_retries: int = Field(
+        default=3,
+        ge=0,
+        description="Maximum retry attempts upon encountering 429 Rate Limit",
+    )
+    backoff_factor: float = Field(
+        default=2.0,
+        ge=1.0,
+        description="Exponential backoff factor for rate limit retries",
+    )
+    circuit_breaker_threshold: int = Field(
+        default=3,
+        ge=1,
+        description="Consecutive API failures before pausing subsequent calls in this run",
+    )
 
 
 class PriorityRule(BaseModel):

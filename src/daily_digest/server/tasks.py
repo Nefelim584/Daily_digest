@@ -102,16 +102,21 @@ class TaskManager:
             await self._dispatch_webhook(record)
 
     async def _dispatch_webhook(self, record: TaskRecord) -> None:
-        """Deliver status update payload to requested webhook callback URL."""
+        """Deliver status update payload to requested webhook callback URL with optional security header."""
         webhook_url = record.request.webhook_url
         if not webhook_url:
             return
 
         payload = record.to_response().model_dump()
+        headers = {}
+        if record.request.webhook_secret_token:
+            headers["X-Secret-Token"] = record.request.webhook_secret_token
+
         logger.info("Dispatching webhook for task %s to %s", record.task_id, webhook_url)
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.post(webhook_url, json=payload)
+                resp = await client.post(webhook_url, json=payload, headers=headers)
                 logger.info("Webhook for task %s returned status %d", record.task_id, resp.status_code)
         except Exception as err:
             logger.warning("Failed to deliver webhook for task %s to %s: %s", record.task_id, webhook_url, err)
+

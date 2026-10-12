@@ -21,6 +21,10 @@ class GenerateRequest(BaseModel):
     output_dir: Optional[str] = Field(default=None, description="Output directory path")
     enable_summarization: Optional[bool] = Field(default=None, description="Toggle AI summarization")
     webhook_url: Optional[str] = Field(default=None, description="Callback URL to notify upon completion")
+    webhook_secret_token: Optional[str] = Field(
+        default=None,
+        description="Secret authentication token sent in X-Secret-Token header to protect receiver endpoint",
+    )
 
 
 class GenerateResponse(BaseModel):

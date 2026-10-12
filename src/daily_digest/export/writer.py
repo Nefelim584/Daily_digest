@@ -1,6 +1,7 @@
 """File export handler for saving generated news digests."""
 
 import logging
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Sequence
@@ -13,11 +14,39 @@ logger = logging.getLogger(__name__)
 
 
 class DigestExporter:
-    """Handles writing formatted digests to disk with templated filenames."""
+    """Handles writing formatted digests to disk with templated filenames and atomic file operations."""
 
-    def __init__(self, config: Optional[OutputConfig] = None) -> None:
-        """Initialize exporter with output configuration."""
+    def __init__(
+        self,
+        config: Optional[OutputConfig] = None,
+        clean_orphans_on_init: bool = True,
+    ) -> None:
+        """Initialize exporter with output configuration and clean orphan temp files."""
         self.config = config or OutputConfig()
+        if clean_orphans_on_init:
+            self.cleanup_temporary_files()
+
+    def cleanup_temporary_files(self) -> int:
+        """Clean up any orphan temporary files (.tmp) left by interrupted/crashed runs.
+
+        Returns:
+            Number of removed orphan temporary files.
+        """
+        target_dir = Path(self.config.directory)
+        if not target_dir.exists():
+            return 0
+
+        removed = 0
+        for pattern in (".*.tmp", "*.tmp"):
+            for tmp_file in target_dir.glob(pattern):
+                try:
+                    if tmp_file.is_file():
+                        tmp_file.unlink()
+                        removed += 1
+                        logger.info("Cleaned up orphan temporary file: %s", tmp_file)
+                except OSError as err:
+                    logger.warning("Failed to remove orphan temp file %s: %s", tmp_file, err)
+        return removed
 
     def generate_filename(
         self,
@@ -40,7 +69,7 @@ class DigestExporter:
         format_name: Optional[str] = None,
         generated_at: Optional[datetime] = None,
     ) -> Path:
-        """Save formatted text content to destination file."""
+        """Save formatted text content to destination file atomically."""
         fmt = (format_name or self.config.format).strip().lower()
         filename = self.generate_filename(fmt, generated_at=generated_at)
 
@@ -48,8 +77,23 @@ class DigestExporter:
         target_dir.mkdir(parents=True, exist_ok=True)
 
         target_file = target_dir / filename
-        logger.info("Writing digest to %s", target_file)
-        target_file.write_text(content, encoding="utf-8")
+        # Atomic writing: write to temporary file in the same directory, then rename
+        tmp_file = target_dir / f".{filename}.tmp"
+        logger.info("Writing digest atomically via temp file %s -> %s", tmp_file, target_file)
+
+        try:
+            tmp_file.write_text(content, encoding="utf-8")
+            os.replace(tmp_file, target_file)
+        except Exception as err:
+            if tmp_file.exists():
+                try:
+                    tmp_file.unlink()
+                except OSError:
+                    pass
+            logger.error("Failed to write digest atomically: %s", err)
+            raise
+
+        logger.info("Digest successfully written to %s", target_file)
         return target_file
 
     def export_digest(

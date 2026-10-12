@@ -2,6 +2,11 @@
 # Daily Digest Configuration
 # ==============================================================================
 
+# Network server settings (Property 1: Listen on 0.0.0.0 for Docker container networking)
+server:
+  host: "0.0.0.0"
+  port: 8000
+
 # Default time window for collecting news (in hours)
 time_window:
   default_hours: 24

@@ -47,10 +47,14 @@ class PriorityClassifier:
         items: Iterable[NewsItem],
         reverse_time: bool = True,
     ) -> List[NewsItem]:
-        """Sort items primarily by priority score descending, and secondarily by publication time."""
+        """Sort items deterministically: by priority score descending, publication time, and URL."""
         return sorted(
             items,
-            key=lambda it: (it.priority_score, normalize_datetime(it.published_at) if reverse_time else 0),
+            key=lambda it: (
+                it.priority_score,
+                normalize_datetime(it.published_at) if reverse_time else 0,
+                it.url,
+            ),
             reverse=True,
         )
 

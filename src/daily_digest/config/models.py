@@ -83,8 +83,15 @@ class SourceConfig(BaseModel):
     max_results: int = Field(default=50, ge=1, description="Max items to retrieve from this source")
 
 
+class ServerConfig(BaseModel):
+    """Configuration for HTTP server."""
+    host: str = Field(default="0.0.0.0", description="Network host interface to listen on")
+    port: int = Field(default=8000, ge=1, le=65535, description="Port to listen on")
+
+
 class AppConfig(BaseModel):
     """Root application configuration."""
+    server: ServerConfig = Field(default_factory=ServerConfig)
     time_window: TimeWindowConfig = Field(default_factory=TimeWindowConfig)
     output: OutputConfig = Field(default_factory=OutputConfig)
     cleaning: CleaningConfig = Field(default_factory=CleaningConfig)
@@ -92,3 +99,4 @@ class AppConfig(BaseModel):
     mistral: MistralConfig = Field(default_factory=MistralConfig)
     priorities: List[PriorityRule] = Field(default_factory=list)
     sources: List[SourceConfig] = Field(default_factory=list)
+

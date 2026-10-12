@@ -29,11 +29,20 @@ class PipelineResult:
 
 
 def normalize_url(url: str) -> str:
-    """Normalize URL for deduplication."""
+    """Normalize URL for deduplication by stripping tracking parameters, lowercase domain, and trailing slashes."""
     parsed = urlparse(url.strip())
     netloc = parsed.netloc.lower()
     path = parsed.path.rstrip("/")
-    return f"{parsed.scheme.lower()}://{netloc}{path}"
+    # Filter out common tracking query parameters
+    tracking_prefixes = ("utm_", "ref", "source", "fbclid", "gclid", "mc_")
+    query_parts = []
+    if parsed.query:
+        for part in parsed.query.split("&"):
+            k = part.split("=")[0].lower()
+            if not any(k.startswith(p) for p in tracking_prefixes):
+                query_parts.append(part)
+    query_str = f"?{'&'.join(query_parts)}" if query_parts else ""
+    return f"{parsed.scheme.lower()}://{netloc}{path}{query_str}"
 
 
 class DigestPipeline:
@@ -77,14 +86,21 @@ class DigestPipeline:
             except Exception as err:
                 logger.error("Collector '%s' raised an unexpected error: %s", collector.name, err)
 
-        # 2. Deduplication
+        # 2. Idempotent Deduplication (by normalized canonical URL and normalized title)
         seen_urls: Set[str] = set()
+        seen_titles: Set[str] = set()
         deduped_items: List[NewsItem] = []
         for item in all_raw_items:
-            norm = normalize_url(item.url)
-            if norm not in seen_urls:
-                seen_urls.add(norm)
-                deduped_items.append(item)
+            norm_u = normalize_url(item.url)
+            norm_t = " ".join(item.title.strip().lower().split())
+            if norm_u in seen_urls:
+                continue
+            if norm_t and norm_t in seen_titles:
+                continue
+            seen_urls.add(norm_u)
+            if norm_t:
+                seen_titles.add(norm_t)
+            deduped_items.append(item)
 
         logger.info(
             "Collected %d total items, %d unique after deduplication",

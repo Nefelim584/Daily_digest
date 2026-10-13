@@ -3,18 +3,15 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
+    image: daily-digest:latest
     container_name: daily-digest
     restart: "no"
-    ports:
-      - "${PORT:-8000}:8000"
     env_file:
       - path: ../.env
         required: false
       - path: .env
         required: false
     environment:
-      - HOST=0.0.0.0
-      - PORT=8000
       - DIGEST_OUTPUT_DIR=/app/data/digests
       - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
       - DIGEST_DEFAULT_HOURS=${DIGEST_DEFAULT_HOURS:-24}
@@ -29,11 +26,29 @@ services:
     networks:
       - digest_network
     healthcheck:
-      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()\" || exit 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
+      disable: true
+    command: ["--hours", "${DIGEST_DEFAULT_HOURS:-24}"]
+
+  scheduler:
+    image: mcuadros/ofelia:latest
+    container_name: digest-scheduler
+    restart: unless-stopped
+    depends_on:
+      - daily-digest
+    command: daemon --docker
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - digest_network
+    labels:
+      ofelia.enabled: "true"
+      ofelia.job-run.daily-digest.schedule: "${DIGEST_CRON_SCHEDULE:-@daily}"
+      ofelia.job-run.daily-digest.image: "daily-digest:latest"
+      ofelia.job-run.daily-digest.volume: "daily_digest_shared_volume:/app/data/digests"
+      ofelia.job-run.daily-digest.network: "daily_digest_network"
+      ofelia.job-run.daily-digest.command: "--hours ${DIGEST_DEFAULT_HOURS:-24}"
+      ofelia.job-run.daily-digest.environment: '["DIGEST_OUTPUT_DIR=/app/data/digests", "MISTRAL_API_KEY=${MISTRAL_API_KEY:-}", "RSSHUB_BASE_URL=${RSSHUB_BASE_URL:-https://rsshub.app}"]'
+      ofelia.job-run.daily-digest.delete: "true"
 
 volumes:
   digests_data:

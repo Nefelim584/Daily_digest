@@ -116,11 +116,17 @@ uv run daily-digest --no-summary
 В состав проекта входит готовая конфигурация [`docker/docker-compose.yml`](docker/docker-compose.yml), демонстрирующая запуск сервиса дайджеста и потребителя в единой пользовательской сети:
 
 ```bash
-# Скопируйте настройки окружения
+# 1. Скопируйте настройки окружения
 cp docker/.env.example .env
 
-# Запуск стека в фоновом режиме
-docker compose -f docker/docker-compose.yml up -d
+# 2. Соберите образ
+docker compose -f docker/docker-compose.yml build
+
+# 3. Первый запуск (одноразовый): генерирует дайджест в shared volume и останавливается
+docker compose -f docker/docker-compose.yml run --rm daily-digest
+
+# 4. Запуск фонового планировщика (Ofelia) для ежедневного автозапуска:
+docker compose -f docker/docker-compose.yml up -d scheduler
 ```
 
 ### 2. Архитектурные свойства интеграции (Межсервисный контракт)

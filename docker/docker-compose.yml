@@ -42,7 +42,7 @@ services:
       - digest_network
     labels:
       ofelia.enabled: "true"
-      ofelia.job-run.daily-digest.schedule: "${DIGEST_CRON_SCHEDULE:-@daily}"
+      ofelia.job-run.daily-digest.schedule: "${DIGEST_CRON_SCHEDULE:-0 0 7 * * *}"
       ofelia.job-run.daily-digest.image: "daily-digest:latest"
       ofelia.job-run.daily-digest.volume: "daily_digest_shared_volume:/app/data/digests"
       ofelia.job-run.daily-digest.network: "daily_digest_network"

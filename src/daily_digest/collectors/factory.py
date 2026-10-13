@@ -4,6 +4,7 @@ import logging
 from typing import List, Optional
 
 from ..config.models import AppConfig, SourceConfig
+from ..summarization.search_fallback import MistralSearchFallback
 from .arxiv import ArxivCollector
 from .base import BaseCollector
 from .huggingface import HuggingFacePapersCollector
@@ -13,7 +14,11 @@ from .rsshub import RSSHubCollector
 logger = logging.getLogger(__name__)
 
 
-def create_collector(source: SourceConfig, app_config: AppConfig) -> Optional[BaseCollector]:
+def create_collector(
+    source: SourceConfig,
+    app_config: AppConfig,
+    search_fallback: Optional[MistralSearchFallback] = None,
+) -> Optional[BaseCollector]:
     """Create appropriate collector instance based on source configuration."""
     if not source.enabled:
         return None
@@ -44,6 +49,7 @@ def create_collector(source: SourceConfig, app_config: AppConfig) -> Optional[Ba
             name=source.name,
             url=source.url,
             cleaning_config=app_config.cleaning,
+            search_fallback=search_fallback,
         )
 
     if collector_type == "rsshub":
@@ -53,6 +59,7 @@ def create_collector(source: SourceConfig, app_config: AppConfig) -> Optional[Ba
             base_url=app_config.rsshub.base_url,
             access_key=app_config.rsshub.access_key,
             cleaning_config=app_config.cleaning,
+            search_fallback=search_fallback,
         )
 
     logger.warning("Unknown collector type '%s' for source '%s'", source.type, source.name)
@@ -61,9 +68,13 @@ def create_collector(source: SourceConfig, app_config: AppConfig) -> Optional[Ba
 
 def create_collectors(app_config: AppConfig) -> List[BaseCollector]:
     """Instantiate all enabled collectors defined in app configuration."""
+    search_fallback: Optional[MistralSearchFallback] = None
+    if app_config.mistral.enabled and app_config.mistral.web_search_fallback and app_config.mistral.api_key:
+        search_fallback = MistralSearchFallback(app_config.mistral)
+
     collectors: List[BaseCollector] = []
     for source_cfg in app_config.sources:
-        collector = create_collector(source_cfg, app_config)
+        collector = create_collector(source_cfg, app_config, search_fallback=search_fallback)
         if collector is not None:
             collectors.append(collector)
     return collectors

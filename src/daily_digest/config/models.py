@@ -60,6 +60,15 @@ class MistralConfig(BaseModel):
         default_factory=lambda: ["ministral-8b-latest", "open-mistral-7b"],
         description="Prioritized backup models to use when the primary model fails or hits rate limits",
     )
+    web_search_fallback: bool = Field(
+        default=True,
+        description="Enable Mistral web search fallback when source collectors encounter network or HTTP errors",
+    )
+    search_fallback_pacing_seconds: float = Field(
+        default=2.0,
+        ge=0.0,
+        description="Pacing delay in seconds between web search fallback queries to respect rate limits",
+    )
     temperature: float = Field(default=0.2, ge=0.0, le=1.0, description="Sampling temperature")
     max_tokens: int = Field(default=300, ge=50, description="Max response tokens per summary")
     prompt_template: str = Field(

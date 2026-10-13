@@ -61,9 +61,10 @@ class HuggingFacePapersCollector(BaseCollector):
                 url = "https://huggingface.co/papers"
 
             date_str = (
-                paper.get("publishedAt")
+                paper.get("submittedOnDailyAt")
+                or record.get("submittedOnDailyAt")
                 or record.get("publishedAt")
-                or paper.get("submittedOnDailyAt")
+                or paper.get("publishedAt")
             )
             published_at = self.parse_datetime(date_str) if date_str else None
 

@@ -35,6 +35,8 @@ rsshub:
 # Mistral AI API settings (One call per news item for summarization)
 mistral:
   enabled: true
+  web_search_fallback: true       # Use Mistral web search when a source feed/route encounters an error
+  search_fallback_pacing_seconds: 2.0  # Pacing delay between search queries to prevent 429
   env_file: ".env"                # Load environment variables from .env file
   api_key_env: "MISTRAL_API_KEY"  # Key name in .env
   model: "mistral-small-latest"   # Chosen primary model

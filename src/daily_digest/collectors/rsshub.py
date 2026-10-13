@@ -24,6 +24,7 @@ class RSSHubCollector(BaseCollector):
         access_key: str = "",
         fetcher: Optional[HTTPFetcher] = None,
         cleaning_config: Optional[CleaningConfig] = None,
+        search_fallback: Optional[Any] = None,
     ) -> None:
         """Initialize RSSHub collector.
 
@@ -34,11 +35,13 @@ class RSSHubCollector(BaseCollector):
             access_key: Optional access key/token for RSSHub authentication.
             fetcher: HTTP fetcher instance.
             cleaning_config: Cleaning configuration.
+            search_fallback: Optional MistralSearchFallback instance.
         """
         super().__init__(name=name, fetcher=fetcher, cleaning_config=cleaning_config)
         self.routes = routes
         self.base_url = base_url.rstrip("/")
         self.access_key = access_key
+        self.search_fallback = search_fallback
 
     def _extract_content(self, entry: feedparser.FeedParserDict) -> str:
         """Extract post content or description from feed entry."""
@@ -55,8 +58,29 @@ class RSSHubCollector(BaseCollector):
 
         return ""
 
-    def _collect_route(self, route: str) -> List[NewsItem]:
-        """Fetch and parse a single RSSHub route."""
+    def _trigger_fallback(self, route: str, url: str, source_label: str, hours: int) -> List[NewsItem]:
+        """Trigger Mistral web search fallback for a failed RSSHub route."""
+        if not self.search_fallback or not getattr(self.search_fallback, "is_available", False):
+            return []
+
+        route_clean = route.strip("/")
+        is_twitter = "/twitter/user/" in route or route_clean.startswith("twitter/user/")
+        route_label = route_clean.split("/")[-1]
+
+        if is_twitter:
+            return self.search_fallback.search_twitter_fallback(
+                username=route_label,
+                source_label=source_label,
+                hours=hours,
+            )
+        return self.search_fallback.search_source_fallback(
+            source_name=source_label,
+            source_url=url,
+            hours=hours,
+        )
+
+    def _collect_route(self, route: str, hours: int = 24) -> List[NewsItem]:
+        """Fetch and parse a single RSSHub route, falling back to Mistral search on error."""
         url = f"{self.base_url}/{route.lstrip('/')}"
         params: Dict[str, str] = {}
         headers: Dict[str, str] = {}
@@ -65,20 +89,20 @@ class RSSHubCollector(BaseCollector):
             params["key"] = self.access_key
             headers["Authorization"] = f"Bearer {self.access_key}"
 
+        route_label = route.strip("/").split("/")[-1]
+        source_label = f"{self.name} (@{route_label})" if "/twitter/user/" in route else self.name
+
         try:
             logger.info("Fetching RSSHub route %s", url)
             xml_text = self.fetcher.fetch_text(url, params=params if params else None, headers=headers if headers else None)
         except FetchError as err:
             logger.warning("Could not fetch RSSHub route %s: %s", url, err)
-            return []
+            return self._trigger_fallback(route, url, source_label, hours)
 
         parsed = feedparser.parse(xml_text)
         if parsed.bozo and not parsed.entries:
             logger.warning("Failed to parse RSSHub response for %s: %s", url, parsed.bozo_exception)
-            return []
-
-        route_label = route.strip("/").split("/")[-1]
-        source_label = f"{self.name} (@{route_label})" if "/twitter/user/" in route else self.name
+            return self._trigger_fallback(route, url, source_label, hours)
 
         items: List[NewsItem] = []
         for entry in parsed.entries:
@@ -113,7 +137,7 @@ class RSSHubCollector(BaseCollector):
         all_items: List[NewsItem] = []
 
         for route in self.routes:
-            items = self._collect_route(route)
+            items = self._collect_route(route, hours=hours)
             all_items.extend(items)
 
         return self.filter_items(all_items, hours=hours, now=now)

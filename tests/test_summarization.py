@@ -118,6 +118,7 @@ def test_summarizer_circuit_breaker_triggers(monkeypatch):
     cfg = MistralConfig(
         enabled=True,
         api_key="test-key",
+        fallback_models=[],
         max_retries=1,
         rate_limit_delay_seconds=0.0,
         circuit_breaker_threshold=2,

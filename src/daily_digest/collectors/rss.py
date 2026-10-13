@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, List, Optional
 import feedparser
 
 from ..config.models import CleaningConfig
@@ -22,6 +22,7 @@ class RSSCollector(BaseCollector):
         url: str,
         fetcher: Optional[HTTPFetcher] = None,
         cleaning_config: Optional[CleaningConfig] = None,
+        search_fallback: Optional[Any] = None,
     ) -> None:
         """Initialize RSS collector.
 
@@ -30,9 +31,11 @@ class RSSCollector(BaseCollector):
             url: RSS/Atom feed URL.
             fetcher: HTTP fetcher instance.
             cleaning_config: Cleaning configuration.
+            search_fallback: Optional MistralSearchFallback instance.
         """
         super().__init__(name=name, fetcher=fetcher, cleaning_config=cleaning_config)
         self.url = url
+        self.search_fallback = search_fallback
 
     def _extract_content(self, entry: feedparser.FeedParserDict) -> str:
         """Extract article content or description from feed entry."""
@@ -56,6 +59,12 @@ class RSSCollector(BaseCollector):
             xml_text = self.fetcher.fetch_text(self.url)
         except FetchError as err:
             logger.warning("Could not fetch RSS feed for '%s' (%s): %s", self.name, self.url, err)
+            if self.search_fallback and getattr(self.search_fallback, "is_available", False):
+                return self.search_fallback.search_source_fallback(
+                    source_name=self.name,
+                    source_url=self.url,
+                    hours=hours,
+                )
             return []
 
         parsed = feedparser.parse(xml_text)
@@ -66,6 +75,12 @@ class RSSCollector(BaseCollector):
                 self.url,
                 parsed.bozo_exception,
             )
+            if self.search_fallback and getattr(self.search_fallback, "is_available", False):
+                return self.search_fallback.search_source_fallback(
+                    source_name=self.name,
+                    source_url=self.url,
+                    hours=hours,
+                )
             return []
 
         items: List[NewsItem] = []

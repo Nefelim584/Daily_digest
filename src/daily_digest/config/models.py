@@ -56,6 +56,10 @@ class MistralConfig(BaseModel):
     api_key_env: str = Field(default="MISTRAL_API_KEY", description="Environment variable name for API key")
     api_key: Optional[str] = Field(default=None, description="Resolved API key value at runtime")
     model: str = Field(default="mistral-small-latest", description="Mistral model name")
+    fallback_models: List[str] = Field(
+        default_factory=lambda: ["ministral-8b-latest", "open-mistral-7b"],
+        description="Prioritized backup models to use when the primary model fails or hits rate limits",
+    )
     temperature: float = Field(default=0.2, ge=0.0, le=1.0, description="Sampling temperature")
     max_tokens: int = Field(default=300, ge=50, description="Max response tokens per summary")
     prompt_template: str = Field(

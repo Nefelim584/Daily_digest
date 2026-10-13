@@ -71,7 +71,7 @@ class MarkdownFormatter(BaseFormatter):
                         elif summary_line:
                             lines.append(f"  - {summary_line}")
 
-                if item.clean_snippet:
+                elif item.clean_snippet:
                     lines.append("- **Snippet:**")
                     lines.append(f"  > {item.clean_snippet}")
 

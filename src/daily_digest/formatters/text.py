@@ -67,7 +67,7 @@ class PlainTextFormatter(BaseFormatter):
                         if s_line:
                             lines.append(f"     {s_line}")
 
-                if item.clean_snippet:
+                elif item.clean_snippet:
                     lines.append("   Snippet:")
                     for c_line in item.clean_snippet.strip().split("\n"):
                         c_line = c_line.strip()

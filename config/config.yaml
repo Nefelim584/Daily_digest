@@ -37,7 +37,10 @@ mistral:
   enabled: true
   env_file: ".env"                # Load environment variables from .env file
   api_key_env: "MISTRAL_API_KEY"  # Key name in .env
-  model: "mistral-small-latest"   # Chosen model
+  model: "mistral-small-latest"   # Chosen primary model
+  fallback_models:                # Prioritized backup models (higher intelligence first)
+    - "ministral-8b-latest"       # Backup 1: smarter edge/server model (8B)
+    - "open-mistral-7b"           # Backup 2: fast and reliable baseline model (7B)
   temperature: 0.2
   max_tokens: 300
   prompt_template: >

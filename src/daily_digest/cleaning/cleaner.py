@@ -17,6 +17,14 @@ class HTMLCleaner:
         r"<img\b[^>]*>|<picture\b[^>]*>.*?</picture>|<figure\b[^>]*>.*?</figure>|!\[.*?\]\(.*?\)",
         flags=re.IGNORECASE | re.DOTALL,
     )
+    MEDIA_TAG_PATTERN = re.compile(
+        r"<(video|audio|source)\b[^>]*>.*?</\1>|<(video|audio|source)\b[^>]*>",
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    BARE_MEDIA_URL_PATTERN = re.compile(
+        r"https?://\S+?\.(?:mp4|webm|m4v|ogg|ogv|mov|avi|wmv|mp3|wav|flac|png|jpg|jpeg|gif|webp|svg)(?:\?\S*)?",
+        flags=re.IGNORECASE,
+    )
     LINK_TAG_PATTERN = re.compile(
         r"<a\b[^>]*>(.*?)</a>|\[([^\]]+)\]\([^\)]+\)",
         flags=re.IGNORECASE | re.DOTALL,
@@ -44,6 +52,8 @@ class HTMLCleaner:
         # 2. Strip images and media
         if self.config.strip_images:
             text = self.IMAGE_PATTERN.sub(" ", text)
+            text = self.MEDIA_TAG_PATTERN.sub(" ", text)
+            text = self.BARE_MEDIA_URL_PATTERN.sub(" ", text)
 
         # 3. Strip links (keep inner anchor text if present)
         if self.config.strip_links:

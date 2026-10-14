@@ -62,6 +62,15 @@ def load_config(config_path: Union[str, Path] = "config/config.yaml") -> AppConf
         # but mark key as None so warning/degradation can occur during Phase 4.
         config.mistral.api_key = None
 
+    # Resolve Gemini API key from environment
+    gemini_key_var = config.gemini.api_key_env
+    resolved_gemini_key = os.getenv(gemini_key_var) or os.getenv("GEMINI_API_KEY")
+    if resolved_gemini_key:
+        config.gemini.api_key = resolved_gemini_key.strip()
+    elif config.gemini.enabled:
+        config.gemini.api_key = None
+
+
     # 12-Factor App: Dynamic configuration overrides via environment variables
     output_dir_env = os.getenv("DIGEST_OUTPUT_DIR") or os.getenv("BOT_DIGESTS_PATH")
     if output_dir_env:

@@ -19,13 +19,19 @@ logger = logging.getLogger(__name__)
 class MistralSearchFallback:
     """Provides WebSearch-augmented fallback completions for failed news sources."""
 
-    def __init__(self, config: Optional[MistralConfig] = None) -> None:
+    def __init__(
+        self,
+        config: Optional[MistralConfig] = None,
+        gemini_fallback: Optional[Any] = None,
+    ) -> None:
         """Initialize Mistral Search Fallback client.
 
         Args:
             config: Mistral configuration settings.
+            gemini_fallback: Optional GeminiSearchFallback instance for fallback chain.
         """
         self.config = config or MistralConfig()
+        self.gemini_fallback = gemini_fallback
         self._client: Optional[Mistral] = None
         self._consecutive_failures: int = 0
         self._circuit_open: bool = False
@@ -39,14 +45,20 @@ class MistralSearchFallback:
 
     @property
     def is_available(self) -> bool:
-        """Whether web search fallback is configured and active."""
-        return bool(
+        """Whether web search fallback is configured and active (Mistral or Gemini)."""
+        mistral_ok = bool(
             self.config.enabled
             and self.config.web_search_fallback
             and self.config.api_key
             and self._client is not None
             and not self._circuit_open
         )
+        gemini_ok = bool(
+            self.gemini_fallback is not None
+            and getattr(self.gemini_fallback, "is_available", False)
+        )
+        return mistral_ok or gemini_ok
+
 
     def _execute_search_conversation(self, prompt: str) -> Optional[str]:
         """Execute a single completion with WebSearchTool, with 429 retry and rate limiting.
@@ -174,42 +186,58 @@ class MistralSearchFallback:
             "Output ONLY the JSON array inside a ```json ``` code block."
         )
 
-        logger.info("Triggering Mistral WebSearch fallback for source '%s'", source_name)
-        raw_text = self._execute_search_conversation(prompt)
-        if not raw_text:
-            return []
+        # 1. Try Mistral if available
+        if self.config.enabled and self.config.web_search_fallback and self.config.api_key and self._client and not self._circuit_open:
+            logger.info("Triggering Mistral WebSearch fallback for source '%s'", source_name)
+            raw_text = self._execute_search_conversation(prompt)
+            if raw_text:
+                parsed_items = self._parse_json_array(raw_text)
+                items: List[NewsItem] = []
+                now = datetime.now(timezone.utc)
 
-        parsed_items = self._parse_json_array(raw_text)
-        items: List[NewsItem] = []
-        now = datetime.now(timezone.utc)
+                for obj in parsed_items:
+                    if not isinstance(obj, dict):
+                        continue
+                    title = str(obj.get("title", "")).strip()
+                    url = str(obj.get("url", "")).strip()
+                    summary = str(obj.get("summary", "")).strip()
 
-        for obj in parsed_items:
-            if not isinstance(obj, dict):
-                continue
-            title = str(obj.get("title", "")).strip()
-            url = str(obj.get("url", "")).strip()
-            summary = str(obj.get("summary", "")).strip()
+                    if not title or not url:
+                        continue
 
-            if not title or not url:
-                continue
+                    item = NewsItem(
+                        title=title,
+                        url=url,
+                        published_at=now,
+                        source=f"{source_name} (Web Search)",
+                        raw_content=summary,
+                        clean_snippet=summary,
+                        summary=summary,
+                    )
+                    items.append(item)
 
-            item = NewsItem(
-                title=title,
-                url=url,
-                published_at=now,
-                source=f"{source_name} (Web Search)",
-                raw_content=summary,
-                clean_snippet=summary,
-                summary=summary,
+                if items:
+                    logger.info(
+                        "Mistral WebSearch fallback for '%s' retrieved %d items",
+                        source_name,
+                        len(items),
+                    )
+                    return items
+
+        # 2. Cascade to Gemini fallback models if Mistral failed, had no key, or returned empty
+        if self.gemini_fallback and getattr(self.gemini_fallback, "is_available", False):
+            logger.info(
+                "Cascading to Gemini web search fallback (%s) for source '%s'",
+                getattr(self.gemini_fallback, "active_model", "gemini"),
+                source_name,
             )
-            items.append(item)
+            return self.gemini_fallback.search_source_fallback(
+                source_name=source_name,
+                source_url=source_url,
+                hours=hours,
+            )
 
-        logger.info(
-            "Mistral WebSearch fallback for '%s' retrieved %d items",
-            source_name,
-            len(items),
-        )
-        return items
+        return []
 
     def search_twitter_fallback(
         self,
@@ -252,40 +280,57 @@ class MistralSearchFallback:
             "Output ONLY the JSON array inside a ```json ``` code block."
         )
 
-        logger.info("Triggering Mistral WebSearch fallback for X/Twitter user @%s", clean_user)
-        raw_text = self._execute_search_conversation(prompt)
-        if not raw_text:
-            return []
+        # 1. Try Mistral if available
+        if self.config.enabled and self.config.web_search_fallback and self.config.api_key and self._client and not self._circuit_open:
+            logger.info("Triggering Mistral WebSearch fallback for X/Twitter user @%s", clean_user)
+            raw_text = self._execute_search_conversation(prompt)
+            if raw_text:
+                parsed_items = self._parse_json_array(raw_text)
+                items: List[NewsItem] = []
+                now = datetime.now(timezone.utc)
 
-        parsed_items = self._parse_json_array(raw_text)
-        items: List[NewsItem] = []
-        now = datetime.now(timezone.utc)
+                for obj in parsed_items:
+                    if not isinstance(obj, dict):
+                        continue
+                    title = str(obj.get("title", "")).strip() or f"@{clean_user} update"
+                    summary = str(obj.get("summary", "")).strip()
+                    # Enforce user profile URL (no status IDs)
+                    url = profile_url
 
-        for obj in parsed_items:
-            if not isinstance(obj, dict):
-                continue
-            title = str(obj.get("title", "")).strip() or f"@{clean_user} update"
-            summary = str(obj.get("summary", "")).strip()
-            # Enforce user profile URL (no status IDs)
-            url = profile_url
+                    if not summary:
+                        continue
 
-            if not summary:
-                continue
+                    item = NewsItem(
+                        title=title,
+                        url=url,
+                        published_at=now,
+                        source=f"{source_label} (Web Search)",
+                        raw_content=summary,
+                        clean_snippet=summary,
+                        summary=summary,
+                    )
+                    items.append(item)
 
-            item = NewsItem(
-                title=title,
-                url=url,
-                published_at=now,
-                source=f"{source_label} (Web Search)",
-                raw_content=summary,
-                clean_snippet=summary,
-                summary=summary,
+                if items:
+                    logger.info(
+                        "Mistral WebSearch fallback for @%s retrieved %d items",
+                        clean_user,
+                        len(items),
+                    )
+                    return items
+
+        # 2. Cascade to Gemini fallback models if Mistral failed, had no key, or returned empty
+        if self.gemini_fallback and getattr(self.gemini_fallback, "is_available", False):
+            logger.info(
+                "Cascading to Gemini web search fallback (%s) for Twitter user @%s",
+                getattr(self.gemini_fallback, "active_model", "gemini"),
+                clean_user,
             )
-            items.append(item)
+            return self.gemini_fallback.search_twitter_fallback(
+                username=username,
+                source_label=source_label,
+                hours=hours,
+            )
 
-        logger.info(
-            "Mistral WebSearch fallback for @%s retrieved %d items",
-            clean_user,
-            len(items),
-        )
-        return items
+        return []
+

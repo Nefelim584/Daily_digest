@@ -67,15 +67,24 @@ cd Daily_Digest
 uv sync
 ```
 
-### 2. Настройка AI-суммаризации (опционально)
+### 2. Настройка AI-суммаризации и WebSearch Fallback (опционально)
 
-Создайте файл `.env` в корне проекта и добавьте ключ Mistral:
+Создайте файл `.env` в корне проекта и добавьте необходимые API-ключи:
 
 ```env
+# Ключ Mistral AI (для суммаризации новостей и основного веб-поиска)
 MISTRAL_API_KEY=ваш_ключ_от_mistral_ai
+
+# Ключ Google Gemini (для каскадных fallback моделей с веб-поиском)
+GEMINI_API_KEY=ваш_ключ_от_google_ai_studio
 ```
 
-> *Если ключ не указан, бот просто возьмет чистый фрагмент текста статьи, ничего не сломается.*
+> 💡 **Каскадный WebSearch Fallback**: если RSS-лента блога или маршрут Twitter/X временно недоступны (ошибки сети, 404, блокировки), бот автоматически ищет свежие релизы и твиты через веб-поиск:
+> 1. Сначала опрашивается **Mistral AI** (`mistral-small-latest` с WebSearchTool).
+> 2. При исчерпании лимитов или ошибках Mistral запрос каскадно переходит на **Gemini 2.5 Flash** (`gemini-2.5-flash` с Google Search grounding).
+> 3. При исчерпании лимитов Flash подхватывает **Gemini 2.5 Flash Lite** (`gemini-2.5-flash-lite`).
+> 
+> *Если ключи не указаны, бот аккуратно пропускает недоступные источники без падения пайплайна.*
 
 ### 3. Запуск
 
@@ -179,14 +188,15 @@ docker compose -f docker/docker-compose.yml up -d scheduler
    - Все параметры связи задаются через `.env`:
      - `DIGEST_OUTPUT_DIR` / `BOT_DIGESTS_PATH` — путь к общей папке дайджестов.
      - `HOST` и `PORT` — сетевой интерфейс и порт.
-     - `MISTRAL_API_KEY` — ключ нейросети.
+     - `MISTRAL_API_KEY` — ключ нейросети Mistral AI.
+     - `GEMINI_API_KEY` — ключ Google Gemini API (fallback модели веб-поиска).
      - `RSSHUB_BASE_URL` — адрес инстанса RSSHub.
 
 ---
 
 ## Тестирование
 
-Проект полностью покрыт unit-тестами (59 тестов):
+Проект полностью покрыт unit-тестами (75 тестов):
 
 ```bash
 uv run pytest

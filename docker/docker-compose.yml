@@ -14,6 +14,7 @@ services:
     environment:
       - DIGEST_OUTPUT_DIR=/app/data/digests
       - MISTRAL_API_KEY=${MISTRAL_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - DIGEST_DEFAULT_HOURS=${DIGEST_DEFAULT_HOURS:-24}
       - RSSHUB_BASE_URL=${RSSHUB_BASE_URL:-https://rsshub.app}
     deploy:
@@ -47,7 +48,7 @@ services:
       ofelia.job-run.daily-digest.volume: "daily_digest_shared_volume:/app/data/digests"
       ofelia.job-run.daily-digest.network: "daily_digest_network"
       ofelia.job-run.daily-digest.command: "--hours ${DIGEST_DEFAULT_HOURS:-24}"
-      ofelia.job-run.daily-digest.environment: '["DIGEST_OUTPUT_DIR=/app/data/digests", "MISTRAL_API_KEY=${MISTRAL_API_KEY:-}", "RSSHUB_BASE_URL=${RSSHUB_BASE_URL:-https://rsshub.app}"]'
+      ofelia.job-run.daily-digest.environment: '["DIGEST_OUTPUT_DIR=/app/data/digests", "MISTRAL_API_KEY=${MISTRAL_API_KEY:-}", "GEMINI_API_KEY=${GEMINI_API_KEY:-}", "RSSHUB_BASE_URL=${RSSHUB_BASE_URL:-https://rsshub.app}"]'
       ofelia.job-run.daily-digest.delete: "true"
 
 volumes:

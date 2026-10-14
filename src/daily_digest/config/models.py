@@ -97,6 +97,38 @@ class MistralConfig(BaseModel):
     )
 
 
+class GeminiConfig(BaseModel):
+    """Configuration for Gemini AI models with web search grounding."""
+    enabled: bool = Field(default=True, description="Enable Gemini AI web search fallback")
+    api_key_env: str = Field(default="GEMINI_API_KEY", description="Environment variable name for Gemini API key")
+    api_key: Optional[str] = Field(default=None, description="Resolved Gemini API key at runtime")
+    models: List[str] = Field(
+        default_factory=lambda: ["gemini-2.5-flash", "gemini-2.5-flash-lite"],
+        description="Prioritized list of Gemini models for web search fallback",
+    )
+    temperature: float = Field(default=0.2, ge=0.0, le=1.0, description="Sampling temperature")
+    search_fallback_pacing_seconds: float = Field(
+        default=1.0,
+        ge=0.0,
+        description="Pacing delay in seconds between Gemini search queries",
+    )
+    max_retries: int = Field(
+        default=3,
+        ge=0,
+        description="Maximum retry attempts on rate limit / 429",
+    )
+    backoff_factor: float = Field(
+        default=2.0,
+        ge=1.0,
+        description="Exponential backoff factor for rate limit retries",
+    )
+    circuit_breaker_threshold: int = Field(
+        default=3,
+        ge=1,
+        description="Consecutive failures before pausing calls",
+    )
+
+
 class PriorityRule(BaseModel):
     """Regex-based rule for assigning category priorities."""
     name: str = Field(description="Human readable category name")
@@ -130,6 +162,8 @@ class AppConfig(BaseModel):
     cleaning: CleaningConfig = Field(default_factory=CleaningConfig)
     rsshub: RSSHubConfig = Field(default_factory=RSSHubConfig)
     mistral: MistralConfig = Field(default_factory=MistralConfig)
+    gemini: GeminiConfig = Field(default_factory=GeminiConfig)
     priorities: List[PriorityRule] = Field(default_factory=list)
     sources: List[SourceConfig] = Field(default_factory=list)
+
 

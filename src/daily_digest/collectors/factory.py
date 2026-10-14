@@ -4,6 +4,7 @@ import logging
 from typing import List, Optional
 
 from ..config.models import AppConfig, SourceConfig
+from ..summarization.gemini_search import GeminiSearchFallback
 from ..summarization.search_fallback import MistralSearchFallback
 from .arxiv import ArxivCollector
 from .base import BaseCollector
@@ -68,9 +69,23 @@ def create_collector(
 
 def create_collectors(app_config: AppConfig) -> List[BaseCollector]:
     """Instantiate all enabled collectors defined in app configuration."""
+    gemini_fallback: Optional[GeminiSearchFallback] = None
+    if getattr(app_config, "gemini", None) and app_config.gemini.enabled and app_config.gemini.api_key:
+        gemini_fallback = GeminiSearchFallback(app_config.gemini)
+
     search_fallback: Optional[MistralSearchFallback] = None
-    if app_config.mistral.enabled and app_config.mistral.web_search_fallback and app_config.mistral.api_key:
-        search_fallback = MistralSearchFallback(app_config.mistral)
+    mistral_configured = bool(
+        app_config.mistral.enabled
+        and app_config.mistral.web_search_fallback
+        and app_config.mistral.api_key
+    )
+    gemini_configured = bool(gemini_fallback and gemini_fallback.is_available)
+
+    if mistral_configured or gemini_configured:
+        search_fallback = MistralSearchFallback(
+            config=app_config.mistral,
+            gemini_fallback=gemini_fallback,
+        )
 
     collectors: List[BaseCollector] = []
     for source_cfg in app_config.sources:
@@ -78,3 +93,4 @@ def create_collectors(app_config: AppConfig) -> List[BaseCollector]:
         if collector is not None:
             collectors.append(collector)
     return collectors
+

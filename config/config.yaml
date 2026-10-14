@@ -49,6 +49,19 @@ mistral:
     You are an AI research digest assistant. Summarize the following news item in 2-3 concise bullet points.
     Focus on key contributions, released models, and benchmark results.
 
+# Gemini API settings (Fallback models with web search / Google Search grounding)
+gemini:
+  enabled: true
+  api_key_env: "GEMINI_API_KEY"        # Key name in .env or environment variable
+  models:                              # Prioritized fallback search models
+    - "gemini-2.5-flash"               # Fallback 1: fast reasoning with Google Search
+    - "gemini-2.5-flash-lite"          # Fallback 2: lightweight high-throughput search
+  temperature: 0.2
+  search_fallback_pacing_seconds: 1.0  # Pacing delay between search queries
+  max_retries: 3
+  backoff_factor: 2.0
+  circuit_breaker_threshold: 3
+
 # Priority & grouping classification rules (Regex matching against titles)
 # Higher priority numbers appear first in the digest.
 priorities:

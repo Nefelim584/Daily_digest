@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 def create_collector(
     source: SourceConfig,
     app_config: AppConfig,
-    search_fallback: Optional[MistralSearchFallback] = None,
+    search_fallback: Optional[Any] = None,
 ) -> Optional[BaseCollector]:
     """Create appropriate collector instance based on source configuration."""
     if not source.enabled:
@@ -73,19 +73,16 @@ def create_collectors(app_config: AppConfig) -> List[BaseCollector]:
     if getattr(app_config, "gemini", None) and app_config.gemini.enabled and app_config.gemini.api_key:
         gemini_fallback = GeminiSearchFallback(app_config.gemini)
 
-    search_fallback: Optional[MistralSearchFallback] = None
-    mistral_configured = bool(
+    search_fallback: Optional[Any] = None
+    if gemini_fallback and gemini_fallback.is_available:
+        # Dedicated web search retriever using Gemini Flash
+        search_fallback = gemini_fallback
+    elif (
         app_config.mistral.enabled
         and app_config.mistral.web_search_fallback
         and app_config.mistral.api_key
-    )
-    gemini_configured = bool(gemini_fallback and gemini_fallback.is_available)
-
-    if mistral_configured or gemini_configured:
-        search_fallback = MistralSearchFallback(
-            config=app_config.mistral,
-            gemini_fallback=gemini_fallback,
-        )
+    ):
+        search_fallback = MistralSearchFallback(config=app_config.mistral)
 
     collectors: List[BaseCollector] = []
     for source_cfg in app_config.sources:

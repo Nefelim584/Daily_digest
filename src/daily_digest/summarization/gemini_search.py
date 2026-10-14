@@ -220,7 +220,7 @@ class GeminiSearchFallback:
             "Return a valid JSON array of objects. Each object must have:\n"
             "- \"title\": clear headline of the announcement\n"
             "- \"url\": direct link to the official article, blog post, or announcement\n"
-            "- \"summary\": 2-3 sentence summary focusing on key findings or releases\n\n"
+            "- \"content\": factual excerpt or snippet describing the announcement\n\n"
             f"If no announcements were published in the last {hours} hours, return an empty array [].\n"
             "Output ONLY the JSON array inside a ```json ``` code block."
         )
@@ -239,21 +239,23 @@ class GeminiSearchFallback:
                 continue
             title = str(obj.get("title", "")).strip()
             url = str(obj.get("url", "")).strip()
-            summary = str(obj.get("summary", "")).strip()
+            content = str(obj.get("content") or obj.get("summary") or "").strip()
 
-            if not title or not url:
+            if not title or not url or not content:
                 continue
 
+            # Gemini acts strictly as a web search retriever; summarization is reserved for Mistral AI
             item = NewsItem(
                 title=title,
                 url=url,
                 published_at=now,
                 source=f"{source_name} (Web Search)",
-                raw_content=summary,
-                clean_snippet=summary,
-                summary=summary,
+                raw_content=content,
+                clean_snippet=content,
+                summary=None,
             )
             items.append(item)
+
 
         logger.info(
             "Gemini WebSearch fallback for '%s' retrieved %d items",
@@ -292,8 +294,8 @@ class GeminiSearchFallback:
             f"- Each object represents an update/topic posted in the last {hours} hours.\n"
             f"- \"title\": Descriptive headline, e.g. \"@{clean_user} on [Topic]\"\n"
             f"- \"url\": \"{profile_url}\" (do NOT link to individual status/tweet IDs)\n"
-            "- \"summary\": Concise summary of what was shared. IMPORTANT: Preserve any external links "
-            "(e.g. GitHub repos, papers, articles) mentioned inside the post directly in the summary text.\n\n"
+            "- \"content\": Raw text or factual excerpt of what was shared. IMPORTANT: Preserve any external links "
+            "(e.g. GitHub repos, papers, articles) mentioned inside the post directly in the content text.\n\n"
             f"If there were no posts from @{clean_user} in the last {hours} hours, return an empty array [].\n"
             "Output ONLY the JSON array inside a ```json ``` code block."
         )
@@ -311,22 +313,24 @@ class GeminiSearchFallback:
             if not isinstance(obj, dict):
                 continue
             title = str(obj.get("title", "")).strip() or f"@{clean_user} update"
-            summary = str(obj.get("summary", "")).strip()
+            content = str(obj.get("content") or obj.get("summary") or "").strip()
             url = profile_url
 
-            if not summary:
+            if not content:
                 continue
 
+            # Gemini acts strictly as a web search retriever; summarization is reserved for Mistral AI
             item = NewsItem(
                 title=title,
                 url=url,
                 published_at=now,
                 source=f"{source_label} (Web Search)",
-                raw_content=summary,
-                clean_snippet=summary,
-                summary=summary,
+                raw_content=content,
+                clean_snippet=content,
+                summary=None,
             )
             items.append(item)
+
 
         logger.info(
             "Gemini WebSearch fallback for @%s retrieved %d items",

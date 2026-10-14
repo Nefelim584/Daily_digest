@@ -72,17 +72,16 @@ uv sync
 Создайте файл `.env` в корне проекта и добавьте необходимые API-ключи:
 
 ```env
-# Ключ Mistral AI (для суммаризации новостей и основного веб-поиска)
+# Ключ Mistral AI (для качественной суммаризации новостей)
 MISTRAL_API_KEY=ваш_ключ_от_mistral_ai
 
-# Ключ Google Gemini (для каскадных fallback моделей с веб-поиском)
+# Ключ Google Gemini (для веб-поиска через Gemini Flash с Google Search grounding)
 GEMINI_API_KEY=ваш_ключ_от_google_ai_studio
 ```
 
-> 💡 **Каскадный WebSearch Fallback**: если RSS-лента блога или маршрут Twitter/X временно недоступны (ошибки сети, 404, блокировки), бот автоматически ищет свежие релизы и твиты через веб-поиск:
-> 1. Сначала опрашивается **Mistral AI** (`mistral-small-latest` с WebSearchTool).
-> 2. При исчерпании лимитов или ошибках Mistral запрос каскадно переходит на **Gemini 2.5 Flash** (`gemini-2.5-flash` с Google Search grounding).
-> 3. При исчерпании лимитов Flash подхватывает **Gemini 2.5 Flash Lite** (`gemini-2.5-flash-lite`).
+> 💡 **Интеллектуальное разделение ролей (Gemini + Mistral)**:
+> 1. **Веб-поиск (Gemini Flash)**: если RSS-лента блога или маршрут Twitter/X временно недоступны (ошибки сети, 404, блокировки), бот осуществляет поиск через **Gemini 2.5 Flash** (`gemini-2.5-flash` с Google Search grounding, а при исчерпании квот — через **Gemini 2.5 Flash Lite**).
+> 2. **Суммаризация (Mistral AI)**: найденные через веб-поиск и собранные из лент статьи передаются в **Mistral AI** (`mistral-small-latest` с цепочкой fallback-моделей `ministral-8b-latest` и `open-mistral-7b`) для генерации кратких и точных выжимок.
 > 
 > *Если ключи не указаны, бот аккуратно пропускает недоступные источники без падения пайплайна.*
 

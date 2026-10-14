@@ -68,7 +68,8 @@ def test_gemini_search_source_fallback_success():
     assert len(items) == 1
     assert items[0].title == "Google DeepMind Unveils Gemini 2.5"
     assert items[0].url == "https://deepmind.google/discover/blog/gemini-2-5"
-    assert "Gemini 2.5 Flash" in items[0].summary
+    assert "Gemini 2.5 Flash" in items[0].clean_snippet
+    assert items[0].summary is None  # Gemini never creates AI summaries
     assert "Google DeepMind (Web Search)" in items[0].source
 
 
@@ -88,7 +89,7 @@ def test_gemini_search_twitter_fallback_profile_url_enforced():
   {
     "title": "@demishassabis on Gemini 2.5 Benchmark",
     "url": "https://x.com/demishassabis/status/987654321",
-    "summary": "Demis shares benchmark details: check report at https://arxiv.org/abs/2501.12345"
+    "content": "Demis shares benchmark details: check report at https://arxiv.org/abs/2501.12345"
   }
 ]
 ```"""
@@ -104,8 +105,10 @@ def test_gemini_search_twitter_fallback_profile_url_enforced():
     assert len(items) == 1
     assert items[0].title == "@demishassabis on Gemini 2.5 Benchmark"
     assert items[0].url == "https://x.com/demishassabis"
-    assert "https://arxiv.org/abs/2501.12345" in items[0].summary
+    assert "https://arxiv.org/abs/2501.12345" in items[0].clean_snippet
+    assert items[0].summary is None
     assert "(@demishassabis) (Web Search)" in items[0].source
+
 
 
 def test_gemini_model_demotion_to_flash_lite():
@@ -228,8 +231,8 @@ def test_mistral_search_fallback_without_mistral_key_uses_gemini_directly():
     mock_gemini.search_source_fallback.assert_called_once()
 
 
-def test_factory_creates_chained_fallback():
-    """Verify create_collectors instantiates chained fallback when Gemini key is configured."""
+def test_factory_assigns_gemini_search_fallback_directly():
+    """Verify create_collectors assigns GeminiSearchFallback directly when Gemini key is configured."""
     app_cfg = load_config("config/config.yaml")
     app_cfg.mistral.api_key = "fake-mistral"
     app_cfg.gemini.api_key = "fake-gemini"
@@ -240,6 +243,22 @@ def test_factory_creates_chained_fallback():
 
     first_collector = rss_collectors[0]
     fallback = first_collector.search_fallback
+    assert isinstance(fallback, GeminiSearchFallback)
+    assert fallback.is_available is True
+
+
+def test_factory_falls_back_to_mistral_when_gemini_not_available():
+    """Verify create_collectors falls back to Mistral search if Gemini is not configured."""
+    app_cfg = load_config("config/config.yaml")
+    app_cfg.gemini.api_key = None
+    app_cfg.mistral.api_key = "fake-mistral"
+    app_cfg.mistral.web_search_fallback = True
+
+    collectors = create_collectors(app_cfg)
+    rss_collectors = [c for c in collectors if getattr(c, "search_fallback", None) is not None]
+    assert len(rss_collectors) > 0
+
+    first_collector = rss_collectors[0]
+    fallback = first_collector.search_fallback
     assert isinstance(fallback, MistralSearchFallback)
-    assert fallback.gemini_fallback is not None
-    assert isinstance(fallback.gemini_fallback, GeminiSearchFallback)
+

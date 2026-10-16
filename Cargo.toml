@@ -34,9 +34,6 @@ html-escape = "0.2"
 regex = "1"
 chrono = { version = "0.4", features = ["serde"] }
 
-# Visualization (cluster charts)
-plotters = "0.3"
-
 # Filesystem (atomic writes)
 tempfile = "3"
 

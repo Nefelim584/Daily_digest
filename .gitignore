@@ -9,6 +9,10 @@ wheels/
 # Virtual environments
 .venv
 
+# Rust build artifacts
+/target/
+**/*.rs.bk
+
 # Project specific
 todo.md
 data/

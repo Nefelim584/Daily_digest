@@ -14,6 +14,9 @@ todo.md
 .claude/
 tests/
 
+# Rust build artifacts
+/target/
+
 # Sensitive data and local outputs
 .env
 data/

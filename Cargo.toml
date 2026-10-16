@@ -1,0 +1,51 @@
+[package]
+name = "daily-digest"
+version = "0.1.0"
+edition = "2021"
+description = "Autonomous AI/tech news digest — single static binary, fully local (no model API calls)"
+license = "MIT"
+
+[[bin]]
+name = "daily-digest"
+path = "src/main.rs"
+
+[dependencies]
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Serialization / config
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+serde_json = "1"
+
+# Async runtime + HTTP client + server
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["json", "gzip"] }
+axum = "0.7"
+
+# Collectors / scraping
+feed-rs = "2"
+scraper = "0.20"
+ammonia = "4"
+
+# Text / time utilities
+regex = "1"
+chrono = { version = "0.4", features = ["serde"] }
+
+# Visualization (cluster charts)
+plotters = "0.3"
+
+# Filesystem (atomic writes)
+tempfile = "3"
+
+# Errors / logging
+anyhow = "1"
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

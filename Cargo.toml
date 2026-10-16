@@ -27,7 +27,8 @@ axum = "0.7"
 # Collectors / scraping
 feed-rs = "2"
 scraper = "0.20"
-ammonia = "4"
+async-trait = "0.1"
+html-escape = "0.2"
 
 # Text / time utilities
 regex = "1"

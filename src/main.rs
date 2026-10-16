@@ -33,7 +33,7 @@ fn main() -> Result<()> {
         )
         .init();
 
-    // Phase 24 smoke test: load and summarize the configuration.
+    // Smoke test: load config and build the collector set.
     let cfg = config::load_config("config/config.yaml")?;
     tracing::info!(
         "Loaded config: {} sources, {} priority rules, default_hours={}, output_format={}",
@@ -42,6 +42,9 @@ fn main() -> Result<()> {
         cfg.time_window.default_hours,
         cfg.output.normalized_format(),
     );
+
+    let collectors = collectors::create_collectors(&cfg);
+    tracing::info!("Initialized {} collectors", collectors.len());
 
     Ok(())
 }

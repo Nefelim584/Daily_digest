@@ -3,7 +3,9 @@
 //!
 //! Ported from the Python `collectors` package. `feed-rs` replaces
 //! `feedparser` and already parses entry dates into `DateTime<Utc>`.
-//! Web-search fallback on failure is deferred to Phase 32 (built-in scraper).
+//! Web-search fallback on failure uses the built-in scraper (Phase 32).
+
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -13,6 +15,7 @@ use crate::config::{AppConfig, CleaningConfig, SourceConfig};
 use crate::filters::{filter_by_time_window, parse_datetime_str};
 use crate::models::NewsItem;
 use crate::network::HttpFetcher;
+use crate::search::WebScraperFallback;
 
 /// Common interface for all source collectors.
 #[async_trait]
@@ -258,6 +261,7 @@ pub struct RssCollector {
     url: String,
     fetcher: HttpFetcher,
     cleaning: CleaningConfig,
+    fallback: Option<Arc<WebScraperFallback>>,
 }
 
 #[async_trait]
@@ -272,12 +276,29 @@ impl Collector for RssCollector {
             Ok(text) => text,
             Err(err) => {
                 tracing::warn!("Could not fetch RSS feed for '{}': {}", self.name, err);
-                // TODO(Phase 32): trigger built-in scraper fallback here.
+                if let Some(fallback) = &self.fallback {
+                    tracing::info!("Triggering web scraper fallback for '{}'", self.name);
+                    return fallback.scrape_blog_fallback(&self.name, &self.url, hours, now).await;
+                }
                 return Vec::new();
             }
         };
 
         let items = feed_to_items(&text, &self.name, &self.cleaning);
+        if items.is_empty() {
+            if let Some(fallback) = &self.fallback {
+                tracing::info!(
+                    "Feed for '{}' produced 0 items; attempting web scraper fallback",
+                    self.name
+                );
+                let fallback_items = fallback
+                    .scrape_blog_fallback(&self.name, &self.url, hours, now)
+                    .await;
+                if !fallback_items.is_empty() {
+                    return fallback_items;
+                }
+            }
+        }
         filter_by_time_window(items, hours, now, true)
     }
 }
@@ -293,10 +314,42 @@ pub struct RsshubCollector {
     access_key: String,
     fetcher: HttpFetcher,
     cleaning: CleaningConfig,
+    fallback: Option<Arc<WebScraperFallback>>,
 }
 
 impl RsshubCollector {
-    async fn collect_route(&self, route: &str) -> Vec<NewsItem> {
+    async fn trigger_fallback(
+        &self,
+        fallback: &WebScraperFallback,
+        route: &str,
+        source_label: &str,
+        url: &str,
+        hours: i64,
+        now: Option<DateTime<Utc>>,
+    ) -> Vec<NewsItem> {
+        let route_clean = route.trim_start_matches('/');
+        let is_twitter = route.contains("/twitter/user/") || route_clean.starts_with("twitter/user/");
+        let route_label = route.trim_matches('/').rsplit('/').next().unwrap_or("");
+
+        if is_twitter {
+            tracing::info!("Triggering Twitter web scraper fallback for @{}", route_label);
+            fallback
+                .scrape_twitter_fallback(route_label, source_label, hours, now)
+                .await
+        } else {
+            tracing::info!("Triggering web scraper fallback for route {}", route);
+            fallback
+                .scrape_blog_fallback(source_label, url, hours, now)
+                .await
+        }
+    }
+
+    async fn collect_route(
+        &self,
+        route: &str,
+        hours: i64,
+        now: Option<DateTime<Utc>>,
+    ) -> Vec<NewsItem> {
         let url = format!("{}/{}", self.base_url, route.trim_start_matches('/'));
         let is_twitter = route.contains("/twitter/user/");
         let route_label = route.trim_matches('/').rsplit('/').next().unwrap_or("");
@@ -315,14 +368,31 @@ impl RsshubCollector {
                 .await
         };
 
-        match result {
-            Ok(text) => feed_to_items(&text, &source_label, &self.cleaning),
+        let text = match result {
+            Ok(text) => text,
             Err(err) => {
                 tracing::warn!("Could not fetch RSSHub route {}: {}", url, err);
-                // TODO(Phase 32): trigger built-in scraper fallback here.
-                Vec::new()
+                if let Some(fallback) = &self.fallback {
+                    return self
+                        .trigger_fallback(fallback, route, &source_label, &url, hours, now)
+                        .await;
+                }
+                return Vec::new();
+            }
+        };
+
+        let items = feed_to_items(&text, &source_label, &self.cleaning);
+        if items.is_empty() {
+            if let Some(fallback) = &self.fallback {
+                let fallback_items = self
+                    .trigger_fallback(fallback, route, &source_label, &url, hours, now)
+                    .await;
+                if !fallback_items.is_empty() {
+                    return fallback_items;
+                }
             }
         }
+        items
     }
 }
 
@@ -335,7 +405,7 @@ impl Collector for RsshubCollector {
     async fn collect(&self, hours: i64, now: Option<DateTime<Utc>>) -> Vec<NewsItem> {
         let mut all_items = Vec::new();
         for route in &self.routes {
-            all_items.extend(self.collect_route(route).await);
+            all_items.extend(self.collect_route(route, hours, now).await);
         }
         filter_by_time_window(all_items, hours, now, true)
     }
@@ -357,7 +427,11 @@ fn make_fetcher(timeout_seconds: u64) -> Option<HttpFetcher> {
 }
 
 /// Build a single collector from a source configuration.
-fn create_collector(source: &SourceConfig, config: &AppConfig) -> Option<Box<dyn Collector>> {
+fn create_collector(
+    source: &SourceConfig,
+    config: &AppConfig,
+    fallback: Option<Arc<WebScraperFallback>>,
+) -> Option<Box<dyn Collector>> {
     if !source.enabled {
         return None;
     }
@@ -411,6 +485,7 @@ fn create_collector(source: &SourceConfig, config: &AppConfig) -> Option<Box<dyn
                 url,
                 fetcher,
                 cleaning,
+                fallback,
             }))
         }
 
@@ -423,6 +498,7 @@ fn create_collector(source: &SourceConfig, config: &AppConfig) -> Option<Box<dyn
                 access_key: config.rsshub.access_key.clone(),
                 fetcher,
                 cleaning,
+                fallback,
             }))
         }
 
@@ -439,9 +515,18 @@ fn create_collector(source: &SourceConfig, config: &AppConfig) -> Option<Box<dyn
 
 /// Instantiate all enabled collectors defined in the application configuration.
 pub fn create_collectors(config: &AppConfig) -> Vec<Box<dyn Collector>> {
+    let fallback = if config.search.enabled {
+        Some(Arc::new(WebScraperFallback::new(
+            &config.search,
+            &config.cleaning,
+        )))
+    } else {
+        None
+    };
+
     let mut collectors: Vec<Box<dyn Collector>> = Vec::new();
     for source in &config.sources {
-        if let Some(collector) = create_collector(source, config) {
+        if let Some(collector) = create_collector(source, config, fallback.clone()) {
             collectors.push(collector);
         }
     }

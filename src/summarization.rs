@@ -120,7 +120,7 @@ fn split_sentences(text: &str) -> Vec<String> {
         current.push(c);
 
         if matches!(c, '.' | '!' | '?') {
-            let next_is_boundary = chars.get(i + 1).map_or(true, |n| n.is_whitespace());
+            let next_is_boundary = chars.get(i + 1).is_none_or(|n| n.is_whitespace());
             if next_is_boundary {
                 let s = current.trim().to_string();
                 if !s.is_empty() {

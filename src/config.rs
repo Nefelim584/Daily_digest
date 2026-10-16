@@ -209,7 +209,7 @@ fn default_max_results() -> usize {
 }
 
 /// Root application configuration.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Default)]
 #[serde(default)]
 pub struct AppConfig {
     pub server: ServerConfig,
@@ -222,23 +222,6 @@ pub struct AppConfig {
     pub search: SearchFallbackConfig,
     pub priorities: Vec<PriorityRule>,
     pub sources: Vec<SourceConfig>,
-}
-
-impl Default for AppConfig {
-    fn default() -> Self {
-        Self {
-            server: ServerConfig::default(),
-            time_window: TimeWindowConfig::default(),
-            output: OutputConfig::default(),
-            cleaning: CleaningConfig::default(),
-            rsshub: RsshubConfig::default(),
-            summarization: SummarizationConfig::default(),
-            clustering: ClusteringConfig::default(),
-            search: SearchFallbackConfig::default(),
-            priorities: Vec::new(),
-            sources: Vec::new(),
-        }
-    }
 }
 
 /// Load, validate, and enrich application configuration from a YAML file.

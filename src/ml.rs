@@ -122,7 +122,7 @@ pub fn assign_clusters(items: &mut [NewsItem], num_clusters: usize) -> usize {
         return 0;
     }
 
-    let docs: Vec<String> = items.iter().map(|i| item_text(i)).collect();
+    let docs: Vec<String> = items.iter().map(item_text).collect();
     let (_, vectors) = TfidfVectorizer::fit(&docs);
 
     let k = resolve_k(num_clusters, n);

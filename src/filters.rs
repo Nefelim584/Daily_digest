@@ -67,7 +67,7 @@ pub fn filter_by_time_window(
         .collect();
 
     if sort_newest_first {
-        filtered.sort_by(|a, b| b.published_at.cmp(&a.published_at));
+        filtered.sort_by_key(|a| std::cmp::Reverse(a.published_at));
     }
 
     filtered

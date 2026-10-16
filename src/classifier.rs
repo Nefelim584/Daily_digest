@@ -26,7 +26,7 @@ impl PriorityClassifier {
     /// Build a classifier from configured rules (sorted by priority descending).
     pub fn new(rules: &[PriorityRule]) -> Self {
         let mut sorted = rules.to_vec();
-        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted.sort_by_key(|a| std::cmp::Reverse(a.priority));
 
         let mut compiled = Vec::new();
         for rule in sorted {

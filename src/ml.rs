@@ -185,6 +185,18 @@ pub fn assign_clusters(items: &mut [NewsItem], num_clusters: usize) -> usize {
     k
 }
 
+/// Assign topic clusters and compute 2D projection coordinates for visualization in one pass.
+pub fn cluster_and_project(items: &mut [NewsItem], num_clusters: usize) -> (usize, Vec<(f64, f64)>) {
+    if items.is_empty() {
+        return (0, Vec::new());
+    }
+    let k = assign_clusters(items, num_clusters);
+    let docs: Vec<String> = items.iter().map(item_text).collect();
+    let (_, vectors) = TfidfVectorizer::fit(&docs);
+    let coords = project_2d(&vectors);
+    (k, coords)
+}
+
 /// Project document vectors to 2D coordinates via dual PCA / classical MDS.
 pub fn project_2d(vectors: &[DocVector]) -> Vec<(f64, f64)> {
     let n = vectors.len();
@@ -232,7 +244,7 @@ pub fn project_2d(vectors: &[DocVector]) -> Vec<(f64, f64)> {
 // Internal helpers
 // ----------------------------------------------------------------------------
 
-fn item_text(item: &NewsItem) -> String {
+pub fn item_text(item: &NewsItem) -> String {
     let body = item.best_text().unwrap_or("");
     format!("{} {}", item.title, body)
 }

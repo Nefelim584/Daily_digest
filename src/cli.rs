@@ -81,16 +81,10 @@ pub async fn run_with_args(args: CliArgs) -> i32 {
     }
 
     if args.serve {
-        tracing::info!(
-            "Starting Daily Digest API server on {}:{}",
-            config.server.host,
-            config.server.port
-        );
-        // Server mode hook for Phase 35
-        println!(
-            "\nDaily Digest API Server listening on http://{}:{}",
-            config.server.host, config.server.port
-        );
+        if let Err(err) = crate::server::run_server(config).await {
+            eprintln!("Server error: {:#}", err);
+            return 1;
+        }
         return 0;
     }
 

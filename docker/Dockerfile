@@ -1,61 +1,56 @@
 # ==============================================================================
-# Stage 1: Build virtual environment with uv
+# Stage 1: Build release binary
 # ==============================================================================
-FROM ghcr.io/astral-sh/uv:latest AS uv_bin
-FROM python:3.14-slim AS builder
-
-COPY --from=uv_bin /uv /uvx /bin/
+FROM rust:bookworm AS builder
 
 WORKDIR /app
 
-ENV UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy
+# Pre-cache dependencies layer
+COPY Cargo.toml Cargo.lock ./
+RUN mkdir src && echo "fn main() {}" > src/main.rs && \
+    cargo build --release && \
+    rm -rf src
 
-# Install dependencies using cached layers
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
-
-# Copy project source and install application package
+# Build actual binary
 COPY src ./src
-COPY README.md ./
-RUN uv sync --frozen --no-dev
+RUN touch src/main.rs && cargo build --release
 
 # ==============================================================================
-# Stage 2: Production runtime image
+# Stage 2: Minimal production runtime image
 # ==============================================================================
-FROM python:3.14-slim AS runner
+FROM debian:bookworm-slim AS runner
 
-# Configurable UID and GID for shared volume permissions alignment (Property 2.1)
+# Configurable UID and GID for shared volume permissions alignment
 ARG USER_ID=1000
 ARG GROUP_ID=1000
 
 RUN groupadd -g ${GROUP_ID} appuser && \
-    useradd -u ${USER_ID} -g appuser -s /bin/bash -m appuser
+    useradd -u ${USER_ID} -g appuser -s /bin/bash -m appuser && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates curl tzdata && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy virtualenv and application from builder
-COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
+# Copy compiled binary and configuration
+COPY --from=builder /app/target/release/daily-digest /usr/local/bin/daily-digest
 COPY --chown=appuser:appuser config /app/config
-COPY --chown=appuser:appuser src /app/src
 
 # Create default data directory for digests with appuser permissions
 RUN mkdir -p /app/data/digests && chown -R appuser:appuser /app/data
 
-ENV PATH="/app/.venv/bin:$PATH" \
-    PYTHONUNBUFFERED=1 \
-    HOST=0.0.0.0 \
+ENV HOST=0.0.0.0 \
     PORT=8000 \
     DIGEST_OUTPUT_DIR=/app/data/digests
 
 USER appuser
 
-# Healthcheck directive probing /health endpoint (Property 4)
+# Healthcheck directive probing /health endpoint
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()" || exit 1
+    CMD curl -f http://127.0.0.1:8000/health || exit 1
 
 EXPOSE 8000
 
-# Entrypoint supports both default --serve and on-demand CLI tasks (Option C)
+# Entrypoint supports both default --serve and on-demand CLI tasks
 ENTRYPOINT ["daily-digest"]
 CMD ["--serve"]

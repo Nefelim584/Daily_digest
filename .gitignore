@@ -1,15 +1,14 @@
-# Python-generated files
-__pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
-
-# Virtual environments
-.venv
+# Rust build artifacts
+/target/
+**/*.rs.bk
 
 # Project specific
 todo.md
 data/
 .env
+
+# Local development / temporary files
+.venv/
+__pycache__/
+*.py[oc]
+.DS_Store

@@ -2,18 +2,18 @@
 .git/
 .gitnexus/
 
-# Virtual environment and caches
-.venv/
-__pycache__/
-*.py[oc]
-*.egg-info/
-.pytest_cache/
-
 # Project metadata and local docs
 todo.md
 .claude/
-tests/
+
+# Rust build artifacts
+/target/
 
 # Sensitive data and local outputs
 .env
 data/
+
+# Caches and virtual environments
+.venv/
+__pycache__/
+*.py[oc]

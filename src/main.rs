@@ -10,6 +10,7 @@
 
 mod classifier;
 mod cleaning;
+mod cli;
 mod collectors;
 mod config;
 mod export;
@@ -23,28 +24,8 @@ mod search;
 mod server;
 mod summarization;
 
-use anyhow::Result;
-
-fn main() -> Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
-        )
-        .init();
-
-    // Smoke test: load config and build the collector set.
-    let cfg = config::load_config("config/config.yaml")?;
-    tracing::info!(
-        "Loaded config: {} sources, {} priority rules, default_hours={}, output_format={}",
-        cfg.sources.len(),
-        cfg.priorities.len(),
-        cfg.time_window.default_hours,
-        cfg.output.normalized_format(),
-    );
-
-    let collectors = collectors::create_collectors(&cfg);
-    tracing::info!("Initialized {} collectors", collectors.len());
-
-    Ok(())
+#[tokio::main]
+async fn main() {
+    let exit_code = cli::run().await;
+    std::process::exit(exit_code);
 }

@@ -532,3 +532,119 @@ pub fn create_collectors(config: &AppConfig) -> Vec<Box<dyn Collector>> {
     }
     collectors
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn build_item_sanitizes_and_truncates() {
+        let cleaning = CleaningConfig {
+            max_characters: 50,
+            strip_html_tags: true,
+            strip_images: true,
+            strip_links: true,
+            strip_scripts: true,
+        };
+        let raw = "<p>This is a <b>long paragraph</b> that needs to be cleaned and truncated properly.</p>";
+        let item = build_item(
+            "Test Source",
+            "Headline",
+            "https://example.com/item",
+            Utc::now(),
+            raw,
+            &cleaning,
+        );
+
+        assert_eq!(item.title, "Headline");
+        assert_eq!(item.url, "https://example.com/item");
+        assert_eq!(item.source, "Test Source");
+        let snippet = item.clean_snippet.unwrap();
+        assert!(!snippet.contains("<p>"));
+        assert!(!snippet.contains("<b>"));
+        assert!(snippet.len() <= 50);
+        assert!(snippet.ends_with("..."));
+    }
+
+    #[test]
+    fn feed_to_items_parses_rss_xml() {
+        let rss_xml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>AI News</title>
+    <link>https://example.com</link>
+    <description>Latest AI News</description>
+    <item>
+      <title>GPT-5 Announcement</title>
+      <link>https://example.com/gpt-5</link>
+      <description><![CDATA[<p>We are excited to announce our newest model.</p>]]></description>
+      <pubDate>Wed, 15 Oct 2026 12:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>"#;
+
+        let cleaning = CleaningConfig::default();
+        let items = feed_to_items(rss_xml, "OpenAI Blog", &cleaning);
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].title, "GPT-5 Announcement");
+        assert_eq!(items[0].url, "https://example.com/gpt-5");
+        assert_eq!(items[0].source, "OpenAI Blog");
+        assert!(items[0].clean_snippet.as_ref().unwrap().contains("We are excited"));
+    }
+
+    #[test]
+    fn arxiv_query_builder_formats_categories() {
+        let fetcher = HttpFetcher::new(20, 1, 1.0, None, 0).unwrap();
+        let collector = ArxivCollector {
+            name: "arXiv".to_string(),
+            categories: vec!["cs.AI".to_string(), "cs.LG".to_string()],
+            max_results: 10,
+            endpoint: ArxivCollector::DEFAULT_ENDPOINT.to_string(),
+            fetcher,
+            cleaning: CleaningConfig::default(),
+        };
+
+        assert_eq!(collector.build_search_query(), "cat:cs.AI OR cat:cs.LG");
+
+        let default_collector = ArxivCollector {
+            name: "arXiv Default".to_string(),
+            categories: Vec::new(),
+            max_results: 10,
+            endpoint: ArxivCollector::DEFAULT_ENDPOINT.to_string(),
+            fetcher: HttpFetcher::new(20, 1, 1.0, None, 0).unwrap(),
+            cleaning: CleaningConfig::default(),
+        };
+        assert_eq!(default_collector.build_search_query(), "cat:cs.AI");
+    }
+
+    #[test]
+    fn create_collectors_respects_enabled_flag() {
+        let mut config = AppConfig::default();
+        config.sources = vec![
+            SourceConfig {
+                name: "Enabled RSS".to_string(),
+                source_type: "rss".to_string(),
+                enabled: true,
+                url: Some("https://example.com/feed.xml".to_string()),
+                endpoint: None,
+                routes: Vec::new(),
+                categories: Vec::new(),
+                max_results: 10,
+            },
+            SourceConfig {
+                name: "Disabled RSS".to_string(),
+                source_type: "rss".to_string(),
+                enabled: false,
+                url: Some("https://example.com/disabled.xml".to_string()),
+                endpoint: None,
+                routes: Vec::new(),
+                categories: Vec::new(),
+                max_results: 10,
+            },
+        ];
+
+        let collectors = create_collectors(&config);
+        assert_eq!(collectors.len(), 1);
+        assert_eq!(collectors[0].name(), "Enabled RSS");
+    }
+}

@@ -288,3 +288,83 @@ fn first_env(names: &[&str]) -> Option<String> {
     }
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_yaml_and_defaults() {
+        let yaml = r#"
+server:
+  host: "127.0.0.1"
+  port: 9000
+
+time_window:
+  default_hours: 48
+
+output:
+  format: "html"
+  directory: "data/custom"
+
+priorities:
+  - name: "Breaking"
+    priority: 100
+    regex: "(?i)breaking"
+
+sources:
+  - name: "Test Feed"
+    type: "rss"
+    url: "https://example.com/rss.xml"
+"#;
+        let config: AppConfig = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(config.server.host, "127.0.0.1");
+        assert_eq!(config.server.port, 9000);
+        assert_eq!(config.time_window.default_hours, 48);
+        assert_eq!(config.output.format, "html");
+        assert_eq!(config.output.directory, PathBuf::from("data/custom"));
+        assert_eq!(config.priorities.len(), 1);
+        assert_eq!(config.priorities[0].name, "Breaking");
+        assert_eq!(config.sources.len(), 1);
+        assert_eq!(config.sources[0].source_type, "rss");
+
+        // Defaults for omitted sections
+        assert_eq!(config.cleaning.max_characters, 1500);
+        assert!(config.summarization.enabled);
+        assert_eq!(config.clustering.dedup_threshold, 0.80);
+        assert!(config.search.enabled);
+    }
+
+    #[test]
+    fn normalized_output_format() {
+        let mut cfg = OutputConfig::default();
+        cfg.format = "markdown".to_string();
+        assert_eq!(cfg.normalized_format(), "markdown");
+
+        cfg.format = "md".to_string();
+        assert_eq!(cfg.normalized_format(), "markdown");
+
+        cfg.format = "text".to_string();
+        assert_eq!(cfg.normalized_format(), "text");
+
+        cfg.format = "txt".to_string();
+        assert_eq!(cfg.normalized_format(), "text");
+
+        cfg.format = "html".to_string();
+        assert_eq!(cfg.normalized_format(), "html");
+
+        cfg.format = "unknown".to_string();
+        assert_eq!(cfg.normalized_format(), "markdown");
+    }
+
+    #[test]
+    fn loads_from_file() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().join("config.yaml");
+        let content = "cleaning:\n  max_characters: 2000\n";
+        std::fs::write(&path, content).unwrap();
+
+        let loaded = load_config(&path).unwrap();
+        assert_eq!(loaded.cleaning.max_characters, 2000);
+    }
+}
